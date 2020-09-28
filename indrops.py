@@ -41,7 +41,6 @@ def string_hamming_distance(str1, str2):
     In information theory, the Hamming distance between two strings of equal 
     length is the number of positions at which the corresponding symbols 
     are different.
-
     eg "karolin" and "kathrin" is 3.
     """
     return sum(itertools.imap(operator.ne, str1, str2))
@@ -197,7 +196,7 @@ class IndropsProject():
 
     def __init__(self, project_yaml_file_handle, read_only=False):
 
-        self.yaml = yaml.load(project_yaml_file_handle)
+        self.yaml = yaml.full_load(project_yaml_file_handle)
 
         self.name = self.yaml['project_name']
         self.project_dir = self.yaml['project_dir']
@@ -297,7 +296,7 @@ class IndropsProject():
             script_dir = os.path.dirname(os.path.realpath(__file__))
             #Read defaults
             with open(os.path.join(script_dir, 'default_parameters.yaml'), 'r') as f:
-                paths = yaml.load(f)['paths']
+                paths = yaml.full_load(f)['paths']
             # Update with user provided values
             paths.update(self.yaml['paths'])
 
@@ -322,7 +321,7 @@ class IndropsProject():
         if not hasattr(self, '_parameters'):
             #Read defaults
             with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'default_parameters.yaml'), 'r') as f:
-                self._parameters = yaml.load(f)['parameters']
+                self._parameters = yaml.full_load(f)['parameters']
             # Update with user provided values
             if 'parameters' in self.yaml:
                 for k, d in self.yaml['parameters'].items():
@@ -613,7 +612,7 @@ class IndropsLibrary():
 
             for part in self.parts:
                 with open(part.filtering_metrics_filename) as f:
-                    part_stats = yaml.load(f)
+                    part_stats = yaml.full_load(f)
                     line = [part.run_name, part.part_name, part_stats['read_structure']['Total'], part_stats['read_structure']['Valid'], part_stats['trimmomatic']['output'], part_stats['complexity_filter']['output']]
                     line += [part_stats['read_structure'][k] if k in part_stats['read_structure'] else 0 for k in structure_parts]
                     line += [part_stats['trimmomatic'][k] if k in part_stats['trimmomatic'] else 0 for k in trimmomatic_parts]
@@ -733,7 +732,6 @@ class IndropsLibrary():
         """
         Function to determine which barcodes this quantification worker might have already quantified.
         This tries to handle interruption during any step of the process.
-
         The worker is assigned some list of barcodes L. For every barcode:
             - It could have been quantified
                 - but have less than min_counts ---> so it got written to `ignored` file.
@@ -872,7 +870,6 @@ class IndropsLibrary():
             print_to_stderr(err.output)
             raise Exception(" === Error in samtools index === ")
 
-        print(genomic_bams)
         for filename in genomic_bams:
             os.remove(filename)
             os.remove(filename + '.bai')
@@ -1226,14 +1223,12 @@ class LibrarySequencingPart():
     def trimmomatic_and_low_complexity_filter_process(self):
         """
         We start 3 processes that are connected with Unix pipes.
-
         Process 1 - Trimmomatic. Doesn't support stdin/stdout, so we instead use named pipes (FIFOs). It reads from FIFO1, and writes to FIFO2. 
         Process 2 - In line complexity filter, a python script. It reads from FIFO2 (Trimmomatic output) and writes to the ouput file. 
         Process 3 - Indexer that counts the number of reads for every barcode. This reads from stdin, writes the reads to stdout and writes the index as a pickle to stderr.
-
         When these are done, we start another process to count the results on the FastQ file.
         """
-        filtered_dir = os.path.dirname(self.filtered_fastq_filename) #We will use the same directory for creating temporary FIFOs, assuming we have write access.
+        filtered_dir = os.path.dirname("/mnt/ram/") #We will use the same directory for creating temporary FIFOs, assuming we have write access.
         
         self.filtering_statistics_counter = defaultdict(int)
         with FIFO(dir=filtered_dir) as fifo2, open(self.filtered_fastq_filename, 'w') as filtered_fastq_file, open(self.filtered_fastq_filename+'.counts.pickle', 'w') as filtered_index_file:
@@ -1321,14 +1316,12 @@ class V1V2Filtering(LibrarySequencingPart):
                 ping_format_data = {k: float(self.filtering_statistics_counter[k])/total for k in ['Valid', 'W1_in_R2', 'empty_read',  'No_W1', 'No_polyT', 'BC1', 'BC2', 'Umi_error']}
                 print_to_stderr(ping_template.format(total=total, rate=sec_per_mil, **ping_format_data))
 
-
         with self.trimmomatic_and_low_complexity_filter_process() as trim_process:
             #Iterate over the weaved reads
             for r_name, r1_seq, r1_qual, r2_seq, r2_qual in self._weave_fastqs(r1_filename, r2_filename):
                     
                 # Check if they should be kept
                 keep, result = self._process_reads(r1_seq, r2_seq, valid_bc1s=bc1s, valid_bc2s=bc2s)
-
                 # Write the the reads worth keeping
                 if keep:
                     bc, umi = result
@@ -1386,7 +1379,7 @@ class V1V2Filtering(LibrarySequencingPart):
             r1_seq = next(r1_stream).rstrip() #Read seq
             next(r1_stream) #+ line
             r1_qual = next(r1_stream).rstrip() #Read qual
-            
+
             next(r2_stream) #Read name
             r2_seq = next(r2_stream).rstrip() #Read seq
             next(r2_stream) #+ line

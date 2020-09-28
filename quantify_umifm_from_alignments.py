@@ -453,4 +453,3 @@ if __name__=="__main__":
     parser.add_argument('--soft-masked-regions', type=argparse.FileType('r'), nargs='?')
     args = parser.parse_args()
     quant(args)
-
